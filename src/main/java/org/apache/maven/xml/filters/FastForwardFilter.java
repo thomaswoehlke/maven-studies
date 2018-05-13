@@ -19,6 +19,9 @@ package org.apache.maven.xml.filters;
  * under the License.
  */
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
@@ -26,14 +29,29 @@ import org.xml.sax.XMLFilter;
 import org.xml.sax.helpers.XMLFilterImpl;
 
 /**
- * This filter will skip all chained filter and write directly to the output
+ * This filter will skip all following filters and write directly to the output.
+ * Should be used in case of a DOM that should not be effected by other filters, even though the elements match 
  * 
  * @author Robert Scholte
  * @since 4.0.0
  */
 public class FastForwardFilter extends XMLFilterImpl
 {
-    private int reports = 0;
+    /**
+     * DOM elements of pom
+     * 
+     * <ul>
+     *  <li>execution.configuration</li>
+     *  <li>plugin.configuration</li>
+     *  <li>plugin.goals</li>
+     *  <li>profile.reports</li>
+     *  <li>project.reports</li>
+     *  <li>reportSet.configuration</li>
+     * <ul>
+     */
+    private final Deque<String> state = new ArrayDeque<>();
+    
+    private int domDepth = 0;
     
     private ContentHandler originalHandler;
 
@@ -41,35 +59,57 @@ public class FastForwardFilter extends XMLFilterImpl
     public void startElement( String uri, String localName, String qName, Attributes atts )
         throws SAXException
     {
-        if ( "reports".equals( localName ) )
-        {
-            reports++;
-            originalHandler = getContentHandler();
-
-            ContentHandler outputContentHandler = getContentHandler();
-            while ( outputContentHandler instanceof XMLFilter )
-            {
-                outputContentHandler = ( (XMLFilter) outputContentHandler ).getContentHandler();
-            }
-            setContentHandler( outputContentHandler );
-        }
         super.startElement( uri, localName, qName, atts );
+        if ( domDepth > 0 )
+        {
+            domDepth++;
+        }
+        else
+        {
+            final String key = state.peek() + '.' + localName;
+            switch ( key )
+            {
+                case "execution.configuration":
+                case "plugin.configuration":
+                case "plugin.goals":
+                case "profile.reports":
+                case "project.reports":
+                case "reportSet.configuration":
+                    domDepth++;
+
+                    originalHandler = getContentHandler();
+
+                    ContentHandler outputContentHandler = getContentHandler();
+                    while ( outputContentHandler instanceof XMLFilter )
+                    {
+                        outputContentHandler = ( (XMLFilter) outputContentHandler ).getContentHandler();
+                    }
+                    setContentHandler( outputContentHandler );
+                    break;
+                default:
+                    break;
+            }
+            state.push( localName );
+        }
     }
     
     @Override
     public void endElement( String uri, String localName, String qName )
         throws SAXException
     {
-        if ( "reports".equals( localName ) )
+        if ( domDepth > 0 )
         {
-            reports--;
+            domDepth--;
             
-            if ( reports == 0 )
+            if ( domDepth == 0 )
             {
                 setContentHandler( originalHandler );
             }
         }
-        
+        else
+        {
+            state.pop();
+        }
         super.endElement( uri, localName, qName );
     }
     

@@ -35,7 +35,7 @@ public class ModelFilter
     extends XMLFilterImpl
 {
     private final XMLFilterChainBuilder builder;
-    
+
     public ModelFilter() throws SAXException
     {
         this( XMLReaderFactory.createXMLReader() );
@@ -46,10 +46,8 @@ public class ModelFilter
         builder = new XMLFilterChainBuilder( parent );
         
         setParent( builder.build() );
-        
-        addFilter( new FastForwardFilter() );
     }
-    
+
     public ModelFilter addFilter( XMLFilter filter )
     {
         builder.addFilter( filter );
@@ -58,7 +56,6 @@ public class ModelFilter
         
         return this;
     }
-
 
     private static class XMLFilterChainBuilder
     {

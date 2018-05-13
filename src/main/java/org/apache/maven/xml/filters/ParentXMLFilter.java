@@ -34,6 +34,7 @@ import org.xml.sax.helpers.XMLFilterImpl;
 /**
  * <p>
  * Transforms relativePath to version.
+ * We could decide to simply allow {@code <parent/>}, but let's require the GA for now for checking
  * </p>
  * 
  * @author Robert Scholte
@@ -44,11 +45,11 @@ public class ParentXMLFilter
     private boolean parsingParent = false;
 
     // states
-    private static final int OTHER = 0;
+    private String state;
 
-    private static final int RELATIVEPATH = 1;
+    private String groupId;
 
-    private int state;
+    private String artifactId;
 
     /**
      * If parent has no version-element, rewrite relativePath to version.<br>
@@ -56,7 +57,7 @@ public class ParentXMLFilter
      * Order of elements must stay the same.
      */
     private boolean hasVersion;
-
+    
     private String resolvedVersion;
 
     private List<SAXEvent> saxEvents = new ArrayList<>();
@@ -84,11 +85,11 @@ public class ParentXMLFilter
     {
         if ( parsingParent )
         {
-            final int eventState = state;
+            final String eventState = state;
 
             saxEvents.add( () -> 
             {
-                if ( !( eventState == RELATIVEPATH && hasVersion ) )
+                if ( !( "relativePath".equals( eventState ) && hasVersion ) )
                 {
                     event.execute();
                 }
@@ -101,7 +102,7 @@ public class ParentXMLFilter
     }
 
     @Override
-    public void startElement( String uri, String localName, String qName, Attributes atts )
+    public void startElement( String uri, final String localName, String qName, Attributes atts )
         throws SAXException
     {
         if ( !parsingParent && "parent".equals( localName ) )
@@ -111,34 +112,33 @@ public class ParentXMLFilter
 
         if ( parsingParent )
         {
-            if ( "relativePath".equals( localName ) )
+            state = localName;
+            
+            switch ( localName )
             {
-                state = RELATIVEPATH;
-                processEvent( () -> 
-                {
-                    if ( resolvedVersion != null )
+                case "relativePath":
+                    processEvent( () -> 
                     {
-                        String versionQName = SAXEventUtils.renameQName( qName, "version" );
+                        if ( resolvedVersion != null )
+                        {
+                            String versionQName = SAXEventUtils.renameQName( qName, "version" );
 
-                        getEventFactory().startElement( uri, "version", versionQName, null ).execute();
-                    }
-                    else
-                    {
-                        getEventFactory().startElement( uri, localName, qName, atts ).execute();
-                    }
-                } );
-                return;
+                            getEventFactory().startElement( uri, "version", versionQName, null ).execute();
+                        }
+                        else
+                        {
+                            getEventFactory().startElement( uri, localName, qName, atts ).execute();
+                        }
+                    } );
+                    break;
+                case "version":
+                    hasVersion = true;
+                    
+                    // fall through
+                default:
+                    processEvent( getEventFactory().startElement( uri, localName, qName, atts ) );
+                    break;
             }
-            else
-            {
-                state = OTHER;
-            }
-
-            if ( "version".equals( localName ) )
-            {
-                hasVersion = true;
-            }
-            processEvent( getEventFactory().startElement( uri, localName, qName, atts ) );
         }
         else
         {
@@ -150,29 +150,44 @@ public class ParentXMLFilter
     public void characters( char[] ch, int start, int length )
         throws SAXException
     {
-        if ( parsingParent && state == RELATIVEPATH )
+        if ( parsingParent )
         {
-            String relativePath = new String( ch, start, length );
-            resolvedVersion = relativePathToVersion( relativePath );
-
-            processEvent( () -> 
+            final String eventState = state;
+            
+            switch ( eventState )
             {
-                if ( resolvedVersion != null )
-                {
-                    getEventFactory().characters( resolvedVersion.toCharArray(), 0,
-                                                  resolvedVersion.length() ).execute();
-                }
-                else
-                {
-                    getEventFactory().characters( ch, start, length ).execute();
-                }
-            } );
+                case "relativePath":
+                    String relativePath = new String( ch, start, length );
+                    resolvedVersion = relativePathToVersion( relativePath );
+
+                    processEvent( () -> 
+                    {
+                        if ( resolvedVersion != null )
+                        {
+                            getEventFactory().characters( resolvedVersion.toCharArray(), 0,
+                                                          resolvedVersion.length() ).execute();
+                        }
+                        else
+                        {
+                            getEventFactory().characters( ch, start, length ).execute();
+                        }
+                    } );
+                    return;
+                case "groupId":
+                    groupId = new String( ch, start, length );
+                    break;
+                case "artifactId":
+                    artifactId = new String( ch, start, length );
+                    break;
+                default:
+                    break;
+            }
+            processEvent( getEventFactory().characters( ch, start, length ) );
         }
         else
         {
-            processEvent( getEventFactory().characters( ch, start, length ) );
+            super.characters( ch, start, length );
         }
-
     }
 
     @Override
@@ -183,40 +198,65 @@ public class ParentXMLFilter
     }
 
     @Override
-    public void endElement( String uri, String localName, String qName )
+    public void endElement( String uri, final String localName, String qName )
         throws SAXException
     {
         if ( !parsingParent )
         {
             super.endElement( uri, localName, qName );
         }
-        else if ( "relativePath".equals( localName ) )
-        {
-            processEvent( () -> 
-            {
-                if ( resolvedVersion != null )
-                {
-                    String versionQName = SAXEventUtils.renameQName( qName, "version" );
-                    getEventFactory().endElement( uri, "version", versionQName ).execute();
-                }
-                else
-                {
-                    getEventFactory().endElement( uri, localName, qName ).execute();
-                }
-            } );
-        }
         else
         {
-            if ( "parent".equals( localName ) )
+            switch ( localName )
             {
-                // not with streams due to checked SAXException
-                for ( SAXEvent saxEvent : saxEvents )
-                {
-                    saxEvent.execute();
-                }
-                parsingParent = false;
+                case "relativePath":
+                    processEvent( () -> 
+                    {
+                        if ( resolvedVersion != null )
+                        {
+                            String versionQName = SAXEventUtils.renameQName( qName, "version" );
+                            getEventFactory().endElement( uri, "version", versionQName ).execute();
+                        }
+                        else
+                        {
+                            getEventFactory().endElement( uri, localName, qName ).execute();
+                        }
+                    } );
+                    break;
+                case "parent":
+                    if ( !hasVersion && resolvedVersion == null && groupId != null && artifactId != null )
+                    {
+                        resolvedVersion = relativePathToVersion( "../pom.xml" );
+    
+                        if ( resolvedVersion != null ) 
+                        {
+                            processEvent( () -> 
+                            {
+                                String versionQName = SAXEventUtils.renameQName( qName, "version" );
+                                
+                                getEventFactory().startElement( uri, "version", versionQName, null ).execute();
+                                
+                                getEventFactory().characters( resolvedVersion.toCharArray(), 0,
+                                                              resolvedVersion.length() ).execute();
+                                
+                                getEventFactory().endElement( uri, "version", versionQName ).execute();
+                            } );
+                        }
+                    }
+                    
+                    // not with streams due to checked SAXException
+                    for ( SAXEvent saxEvent : saxEvents )
+                    {
+                        saxEvent.execute();
+                    }
+                    parsingParent = false;
+                    
+                    // fall through
+                default:
+                    processEvent( getEventFactory().endElement( uri, localName, qName ) );
+                    break;
             }
-            processEvent( getEventFactory().endElement( uri, localName, qName ) );
+            
         }
     }
 

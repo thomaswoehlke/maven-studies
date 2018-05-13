@@ -60,6 +60,24 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
     }
 
     @Test
+    public void testDefaultRelativePath() throws Exception
+    {
+        String input = "<parent>"
+            + "<groupId>GROUPID</groupId>"
+            + "<artifactId>ARTIFACTID</artifactId>"
+            + "</parent>";
+        String expected = "<parent>"
+                        + "<groupId>GROUPID</groupId>"
+                        + "<artifactId>ARTIFACTID</artifactId>"
+                        + "<version>1.0.0</version>"
+                        + "</parent>";
+
+        String actual = transform( input, filter );
+
+        assertEquals( expected, actual );
+    }
+
+    @Test
     public void testNoVersion() throws Exception
     {
         String input = "<parent>"

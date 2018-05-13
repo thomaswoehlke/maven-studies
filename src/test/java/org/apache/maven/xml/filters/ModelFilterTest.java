@@ -37,9 +37,10 @@ public class ModelFilterTest extends AbstractXMLFilterTests
     public void setUp() throws Exception
     {
         filter = new ModelFilter();
-        
-        filter.addFilter( new ParentXMLFilter( x -> "1.0.0" ) );
+        // order matters!!
         filter.addFilter( new ThisXMLFilter( x -> "1.0.0" ) );
+        filter.addFilter( new FastForwardFilter() );
+        filter.addFilter( new ParentXMLFilter( x -> "1.0.0" ) );
         filter.addFilter( new ReactorDependencyXMLFilter( x -> "2.0.0" ) );
     }
     
@@ -108,7 +109,6 @@ public class ModelFilterTest extends AbstractXMLFilterTests
             + "<artifactId>ARTIFACTID</artifactId>"
             + "<relativePath>RELATIVEPATH</relativePath>"
             + "</parent>"
-            + "<name>Project ${this.version}</name>"
             + "</reports></project>";
         
         String expected = input;
