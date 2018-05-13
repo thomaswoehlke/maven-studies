@@ -40,7 +40,7 @@ public class ModelFilterTest extends AbstractXMLFilterTests
         // order matters!!
         filter.addFilter( new ThisXMLFilter( x -> "1.0.0" ) );
         filter.addFilter( new FastForwardFilter() );
-        filter.addFilter( new ParentXMLFilter( x -> "1.0.0" ) );
+        filter.addFilter( new ParentXMLFilter( ( r, g, a ) -> "1.0.0" ) );
         filter.addFilter( new ReactorDependencyXMLFilter( x -> "2.0.0" ) );
     }
     

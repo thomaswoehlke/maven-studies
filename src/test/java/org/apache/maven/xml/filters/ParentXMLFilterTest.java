@@ -32,7 +32,7 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
     @Before
     public void setUp()
     {
-        filter = new ParentXMLFilter( r -> "1.0.0" );
+        filter = new ParentXMLFilter( ( r, g, a ) -> "1.0.0" );
     }
 
     @Test
@@ -99,7 +99,7 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
     @Test
     public void testInvalidRelativePath() throws Exception
     {
-        XMLFilter filter = new ParentXMLFilter( r -> null );
+        XMLFilter filter = new ParentXMLFilter( ( r, g, a ) -> null );
         
         String input = "<parent>"
             + "<groupId>GROUPID</groupId>"

@@ -21,7 +21,6 @@ package org.apache.maven.xml.filters;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 
 import org.apache.maven.xml.SAXEvent;
 import org.apache.maven.xml.SAXEventFactory;
@@ -64,9 +63,9 @@ public class ParentXMLFilter
 
     private SAXEventFactory eventFactory;
 
-    private final Function<String, String> relativePathMapper;
+    private final ParentVersionResolver relativePathMapper;
 
-    public ParentXMLFilter( Function<String, String> relativePathMapper )
+    public ParentXMLFilter( ParentVersionResolver relativePathMapper )
     {
         this.relativePathMapper = relativePathMapper;
     }
@@ -318,6 +317,6 @@ public class ParentXMLFilter
 
     protected String relativePathToVersion( String relativePath )
     {
-        return relativePathMapper.apply( relativePath );
+        return relativePathMapper.resolve( relativePath, groupId, artifactId );
     }
 }
