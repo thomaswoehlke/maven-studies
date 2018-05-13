@@ -59,6 +59,8 @@ public class ParentXMLFilter
     
     private String resolvedVersion;
 
+    private char[] linebreak;
+    
     private List<SAXEvent> saxEvents = new ArrayList<>();
 
     private SAXEventFactory eventFactory;
@@ -155,6 +157,20 @@ public class ParentXMLFilter
             
             switch ( eventState )
             {
+                case "parent":
+                    int l;
+                    for ( l = length ; l >= 0; l-- )
+                    {
+                        int i = start + l - 1; 
+                        if ( ch[i] == '\n' || ch[i] == '\r' )
+                        {
+                            break;
+                        }
+                    }
+                    
+                    linebreak = new char[l];
+                    System.arraycopy( ch, start, linebreak, 0, l );
+                    break;
                 case "relativePath":
                     String relativePath = new String( ch, start, length );
                     resolvedVersion = relativePathToVersion( relativePath );
@@ -233,12 +249,19 @@ public class ParentXMLFilter
                             {
                                 String versionQName = SAXEventUtils.renameQName( qName, "version" );
                                 
+//                                getEventFactory().characters( indent, 0, indent.length ).execute();
+                                
                                 getEventFactory().startElement( uri, "version", versionQName, null ).execute();
                                 
                                 getEventFactory().characters( resolvedVersion.toCharArray(), 0,
                                                               resolvedVersion.length() ).execute();
                                 
                                 getEventFactory().endElement( uri, "version", versionQName ).execute();
+                                
+                                if ( linebreak != null )
+                                {
+                                    getEventFactory().characters( linebreak, 0, linebreak.length ).execute();
+                                }
                             } );
                         }
                     }

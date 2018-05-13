@@ -152,4 +152,24 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
 
         assertEquals( expected, actual );
     }
+
+    
+    @Test
+    public void testIndent() throws Exception
+    {
+        String input = "<parent>\n"
+                    + "  <groupId>GROUPID</groupId>\n"
+                    + "  <artifactId>ARTIFACTID</artifactId>\n"
+                    + "  </parent>";
+        // transformer is responsible for line separator and indents
+        String expected = "<parent>" + System.lineSeparator()
+                    + "  <groupId>GROUPID</groupId>" + System.lineSeparator()
+                    + "  <artifactId>ARTIFACTID</artifactId>" + System.lineSeparator()
+                    + "  <version>1.0.0</version>" + System.lineSeparator()
+                    + "</parent>";
+
+        String actual = transform( input, filter );
+
+        assertEquals( expected, actual );
+    }
 }
