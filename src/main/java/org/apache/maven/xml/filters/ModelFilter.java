@@ -47,6 +47,12 @@ public class ModelFilter
         
         setParent( builder.build() );
     }
+    
+    @Override
+    public void startDocument()
+        throws SAXException
+    {
+    }
 
     public ModelFilter addFilter( XMLFilter filter )
     {

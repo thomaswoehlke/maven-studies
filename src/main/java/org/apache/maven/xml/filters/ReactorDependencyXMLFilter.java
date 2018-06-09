@@ -36,13 +36,7 @@ public class ReactorDependencyXMLFilter extends XMLFilterImpl
 {
 
     // states
-    private static final int GROUPID = 1;
-
-    private static final int ARTIFACTID = 2;
-
-    private static final int OTHER = 0;
-
-    private int state;
+    private String state;
 
     private boolean hasVersion;
 
@@ -61,18 +55,7 @@ public class ReactorDependencyXMLFilter extends XMLFilterImpl
     public void startElement( String uri, String localName, String qName, Attributes atts )
         throws SAXException
     {
-        if ( "groupId".equals( localName ) )
-        {
-            state = GROUPID;
-        }
-        else if ( "artifactId".equals( localName ) )
-        {
-            state = ARTIFACTID;
-        }
-        else
-        {
-            state = OTHER;
-        }
+        state = localName;
 
         if ( "version".equals( localName ) )
         {
@@ -85,13 +68,17 @@ public class ReactorDependencyXMLFilter extends XMLFilterImpl
     public void characters( char[] ch, int start, int length )
         throws SAXException
     {
-        if ( state == GROUPID )
+        final String eventState = state;
+        switch ( eventState )
         {
-            groupId = new String( ch, start, length );
-        }
-        else if ( state == ARTIFACTID )
-        {
-            artifactId = new String( ch, start, length );
+            case "groupId":
+                groupId = new String( ch, start, length );
+                break;
+            case "artifactId":
+                artifactId = new String( ch, start, length );
+                break;
+            default:
+                break;
         }
         super.characters( ch, start, length );
     }

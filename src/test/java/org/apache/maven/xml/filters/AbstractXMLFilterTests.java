@@ -30,12 +30,10 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLFilter;
 import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.XMLFilterImpl;
 import org.xml.sax.helpers.XMLReaderFactory;
 
 public class AbstractXMLFilterTests
@@ -70,44 +68,5 @@ public class AbstractXMLFilterTests
         transformer.transform( transformSource, result );
 
         return writer.toString();
-    }
-
-    protected static final class CharactersXMLFilter
-        extends XMLFilterImpl
-    {
-        @Override
-        public void characters( char[] ch, int start, int length )
-            throws SAXException
-        {
-            super.characters( new char[] { '*', '*', '*' }, 0, 3 );
-        }
-    }
-
-    protected static final class ElementXMLFilter
-        extends XMLFilterImpl
-    {
-        public ElementXMLFilter()
-        {
-            super();
-        }
-
-        public ElementXMLFilter( XMLReader parent )
-        {
-            super( parent );
-        }
-
-        @Override
-        public void startElement( String uri, String localName, String qName, Attributes atts )
-            throws SAXException
-        {
-            super.startElement( uri, "elm", "elm", atts );
-        }
-
-        @Override
-        public void endElement( String uri, String localName, String qName )
-            throws SAXException
-        {
-            super.endElement( uri, "elm", "elm" );
-        }
     }
 }
