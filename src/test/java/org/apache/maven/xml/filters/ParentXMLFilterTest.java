@@ -21,6 +21,8 @@ package org.apache.maven.xml.filters;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Optional;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.xml.sax.XMLFilter;
@@ -32,7 +34,9 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
     @Before
     public void setUp()
     {
-        filter = new ParentXMLFilter( ( r, g, a ) -> "1.0.0" );
+        filter = new ParentXMLFilter( x -> Optional.of( new ParentXMLFilter.RelativeProject( "GROUPID", 
+                                                                                             "ARTIFACTID",
+                                                                                             "1.0.0" ) ) );
     }
 
     @Test
@@ -99,7 +103,7 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
     @Test
     public void testInvalidRelativePath() throws Exception
     {
-        XMLFilter filter = new ParentXMLFilter( ( r, g, a ) -> null );
+        XMLFilter filter = new ParentXMLFilter( x -> Optional.ofNullable( null ) );
         
         String input = "<parent>"
             + "<groupId>GROUPID</groupId>"
@@ -140,7 +144,6 @@ public class ParentXMLFilterTest extends AbstractXMLFilterTests
             + "<relativePath:groupId>GROUPID</relativePath:groupId>"
             + "<relativePath:artifactId>ARTIFACTID</relativePath:artifactId>"
             + "<relativePath:relativePath>RELATIVEPATH</relativePath:relativePath>"
-            + "<relativePath:version>1.0.0</relativePath:version>"
             + "</relativePath:parent>";
         String expected = "<relativePath:parent xmlns:relativePath=\"relativePath\">"
                         + "<relativePath:groupId>GROUPID</relativePath:groupId>"

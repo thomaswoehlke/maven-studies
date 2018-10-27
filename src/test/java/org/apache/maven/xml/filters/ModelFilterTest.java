@@ -21,6 +21,8 @@ package org.apache.maven.xml.filters;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.Optional;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,7 +42,9 @@ public class ModelFilterTest extends AbstractXMLFilterTests
         // order matters!!
         filter.addFilter( new ThisXMLFilter( x -> "1.0.0" ) );
         filter.addFilter( new FastForwardFilter() );
-        filter.addFilter( new ParentXMLFilter( ( r, g, a ) -> "1.0.0" ) );
+        filter.addFilter( new ParentXMLFilter( x -> Optional.of( new ParentXMLFilter.RelativeProject( "GROUPID",
+                                                                                                      "ARTIFACTID",
+                                                                                                      "1.0.0" ) ) ) );
         filter.addFilter( new ReactorDependencyXMLFilter( x -> "2.0.0" ) );
     }
     

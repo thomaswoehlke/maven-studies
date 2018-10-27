@@ -19,8 +19,14 @@ package org.apache.maven.xml.filters;
  * under the License.
  */
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 import org.apache.maven.xml.SAXEvent;
 import org.apache.maven.xml.SAXEventFactory;
@@ -49,25 +55,27 @@ public class ParentXMLFilter
     private String groupId;
 
     private String artifactId;
+    
+    private String relativePath;
 
-    /**
-     * If parent has no version-element, rewrite relativePath to version.<br>
-     * If parent has version-element, then remove relativePath.<br>
-     * Order of elements must stay the same.
-     */
     private boolean hasVersion;
     
-    private String resolvedVersion;
+    private Optional<RelativeProject> resolvedParent;
 
     private char[] linebreak;
     
     private List<SAXEvent> saxEvents = new ArrayList<>();
 
     private SAXEventFactory eventFactory;
+    
+    private final Function<Path, Optional<RelativeProject>> relativePathMapper;
 
-    private final ParentVersionResolver relativePathMapper;
-
-    public ParentXMLFilter( ParentVersionResolver relativePathMapper )
+    /**
+     * 
+     * 
+     * @param relativePathMapper
+     */
+    public ParentXMLFilter( Function<Path, Optional<RelativeProject>> relativePathMapper )
     {
         this.relativePathMapper = relativePathMapper;
     }
@@ -90,7 +98,7 @@ public class ParentXMLFilter
 
             saxEvents.add( () -> 
             {
-                if ( !( "relativePath".equals( eventState ) && hasVersion ) )
+                if ( !( "relativePath".equals( eventState ) && resolvedParent.isPresent() ) )
                 {
                     event.execute();
                 }
@@ -115,36 +123,10 @@ public class ParentXMLFilter
         {
             state = localName;
             
-            switch ( localName )
-            {
-                case "relativePath":
-                    processEvent( () -> 
-                    {
-                        if ( resolvedVersion != null )
-                        {
-                            String versionQName = SAXEventUtils.renameQName( qName, "version" );
-
-                            getEventFactory().startElement( uri, "version", versionQName, null ).execute();
-                        }
-                        else
-                        {
-                            getEventFactory().startElement( uri, localName, qName, atts ).execute();
-                        }
-                    } );
-                    break;
-                case "version":
-                    hasVersion = true;
-                    
-                    // fall through
-                default:
-                    processEvent( getEventFactory().startElement( uri, localName, qName, atts ) );
-                    break;
-            }
+            hasVersion |= "version".equals( localName );
         }
-        else
-        {
-            super.startElement( uri, localName, qName, atts );
-        }
+        
+        processEvent( getEventFactory().startElement( uri, localName, qName, atts ) );
     }
 
     @Override
@@ -172,22 +154,8 @@ public class ParentXMLFilter
                     System.arraycopy( ch, start, linebreak, 0, l );
                     break;
                 case "relativePath":
-                    String relativePath = new String( ch, start, length );
-                    resolvedVersion = relativePathToVersion( relativePath );
-
-                    processEvent( () -> 
-                    {
-                        if ( resolvedVersion != null )
-                        {
-                            getEventFactory().characters( resolvedVersion.toCharArray(), 0,
-                                                          resolvedVersion.length() ).execute();
-                        }
-                        else
-                        {
-                            getEventFactory().characters( ch, start, length ).execute();
-                        }
-                    } );
-                    return;
+                    relativePath = new String( ch, start, length );
+                    break;
                 case "groupId":
                     groupId = new String( ch, start, length );
                     break;
@@ -197,12 +165,9 @@ public class ParentXMLFilter
                 default:
                     break;
             }
-            processEvent( getEventFactory().characters( ch, start, length ) );
         }
-        else
-        {
-            super.characters( ch, start, length );
-        }
+        
+        processEvent( getEventFactory().characters( ch, start, length ) );
     }
 
     @Override
@@ -216,54 +181,15 @@ public class ParentXMLFilter
     public void endElement( String uri, final String localName, String qName )
         throws SAXException
     {
-        if ( !parsingParent )
-        {
-            super.endElement( uri, localName, qName );
-        }
-        else
+        if ( parsingParent )
         {
             switch ( localName )
             {
-                case "relativePath":
-                    processEvent( () -> 
-                    {
-                        if ( resolvedVersion != null )
-                        {
-                            String versionQName = SAXEventUtils.renameQName( qName, "version" );
-                            getEventFactory().endElement( uri, "version", versionQName ).execute();
-                        }
-                        else
-                        {
-                            getEventFactory().endElement( uri, localName, qName ).execute();
-                        }
-                    } );
-                    break;
                 case "parent":
-                    if ( !hasVersion && resolvedVersion == null && groupId != null && artifactId != null )
+                    if ( !hasVersion || relativePath != null )
                     {
-                        resolvedVersion = relativePathToVersion( "../pom.xml" );
-    
-                        if ( resolvedVersion != null ) 
-                        {
-                            processEvent( () -> 
-                            {
-                                String versionQName = SAXEventUtils.renameQName( qName, "version" );
-                                
-//                                getEventFactory().characters( indent, 0, indent.length ).execute();
-                                
-                                getEventFactory().startElement( uri, "version", versionQName, null ).execute();
-                                
-                                getEventFactory().characters( resolvedVersion.toCharArray(), 0,
-                                                              resolvedVersion.length() ).execute();
-                                
-                                getEventFactory().endElement( uri, "version", versionQName ).execute();
-                                
-                                if ( linebreak != null )
-                                {
-                                    getEventFactory().characters( linebreak, 0, linebreak.length ).execute();
-                                }
-                            } );
-                        }
+                        resolvedParent =
+                            resolveRelativePath( Paths.get( Objects.toString( relativePath, "../pom.xml" ) ) );
                     }
                     
                     // not with streams due to checked SAXException
@@ -271,15 +197,37 @@ public class ParentXMLFilter
                     {
                         saxEvent.execute();
                     }
-                    parsingParent = false;
                     
-                    // fall through
+                    if ( !hasVersion && resolvedParent.isPresent() )
+                    {
+                        String versionQName = SAXEventUtils.renameQName( qName, "version" );
+                        
+                        getEventFactory().startElement( uri, "version", versionQName, null ).execute();
+                        
+                        String resolvedParentVersion = resolvedParent.get().getVersion();
+                        
+                        getEventFactory().characters( resolvedParentVersion.toCharArray(), 0,
+                                                      resolvedParentVersion.length() ).execute();
+                        
+                        getEventFactory().endElement( uri, "version", versionQName ).execute();
+                        
+                        if ( linebreak != null )
+                        {
+                            getEventFactory().characters( linebreak, 0, linebreak.length ).execute();
+                        }
+                    }
+                    
+                    parsingParent = false;
+                    break;
                 default:
-                    processEvent( getEventFactory().endElement( uri, localName, qName ) );
                     break;
             }
-            
         }
+        
+        processEvent( getEventFactory().endElement( uri, localName, qName ) );
+
+        // for this simple structure resetting to parent it sufficient
+        state = "parent";
     }
 
     @Override
@@ -338,8 +286,51 @@ public class ParentXMLFilter
         processEvent( getEventFactory().startPrefixMapping( prefix, uri ) );
     }
 
-    protected String relativePathToVersion( String relativePath )
+    protected Optional<RelativeProject> resolveRelativePath( Path relativePath )
     {
-        return relativePathMapper.resolve( relativePath, groupId, artifactId );
+        Optional<RelativeProject> mappedProject = relativePathMapper.apply( relativePath );
+        
+        if ( mappedProject.isPresent() )
+        {
+            RelativeProject project = mappedProject.get();
+            
+            if ( Objects.equals( groupId, project.getGroupId() )
+                && Objects.equals( artifactId, project.getArtifactId() ) )
+            {
+                return mappedProject;
+            }
+        }
+        return Optional.empty();
+    }
+    
+    static class RelativeProject 
+    {
+        private String groupId;
+        
+        private String artifactId;
+        
+        private String version;
+        
+        RelativeProject( String groupId, String artifactId, String version )
+        {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.version = version;
+        }
+
+        public String getGroupId()
+        {
+            return groupId;
+        }
+        
+        public String getArtifactId()
+        {
+            return artifactId;
+        }
+        
+        public String getVersion()
+        {
+            return version;
+        }
     }
 }
