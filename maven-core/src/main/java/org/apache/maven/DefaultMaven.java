@@ -42,6 +42,7 @@ import org.apache.maven.graph.GraphBuilder;
 import org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory;
 import org.apache.maven.lifecycle.internal.ExecutionEventCatapult;
 import org.apache.maven.lifecycle.internal.LifecycleStarter;
+import org.apache.maven.metrics.MetricsSystem;
 import org.apache.maven.model.Prerequisites;
 import org.apache.maven.model.building.ModelProblem;
 import org.apache.maven.model.building.Result;
@@ -94,6 +95,9 @@ public class DefaultMaven
 
     @Requirement( hint = GraphBuilder.HINT )
     private GraphBuilder graphBuilder;
+    
+    @Requirement
+    private MetricsSystem metricsSystem;
 
     @Override
     public MavenExecutionResult execute( MavenExecutionRequest request )
@@ -124,6 +128,11 @@ public class DefaultMaven
         finally
         {
             legacySupport.setSession( null );
+            
+            logger.info("Dumping metrics provider info ("+metricsSystem.getMetricsProvider()+"): ");
+            metricsSystem.getMetricsProvider().dump((k,v) -> {
+                logger.info(k+": "+v);
+            });
         }
 
         return result;
